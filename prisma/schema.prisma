@@ -1,0 +1,857 @@
+// InkSphere — Complete Database Schema
+// Multi-tenant SaaS Blogging Platform
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─────────────────────────────────────────────
+// Authentication & Users
+// ─────────────────────────────────────────────
+
+model User {
+  id            String    @id @default(cuid())
+  name          String?
+  email         String    @unique
+  emailVerified DateTime?
+  image         String?
+  passwordHash  String?
+  bio           String?
+  website       String?
+  location      String?
+  twitterHandle String?
+  githubHandle  String?
+  linkedinUrl   String?
+  twoFactorEnabled Boolean @default(false)
+  twoFactorSecret  String?
+  passkeyCred      String?
+  onboardingComplete Boolean @default(false)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  accounts         Account[]
+  sessions         Session[]
+  workspaceMembers WorkspaceMember[]
+  posts            Post[]
+  comments         Comment[]
+  reactions        Reaction[]
+  bookmarks        Bookmark[]
+  notifications    Notification[]
+  auditLogs        AuditLog[]
+  apiKeys          APIKey[]
+  aiUsages         AIUsage[]
+  loginHistory     LoginHistory[]
+  devices          Device[]
+  followers        Follow[] @relation("followers")
+  following        Follow[] @relation("following")
+
+  @@map("users")
+}
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+  @@map("accounts")
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  ipAddress    String?
+  userAgent    String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("sessions")
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+  @@map("verification_tokens")
+}
+
+model LoginHistory {
+  id        String   @id @default(cuid())
+  userId    String
+  ipAddress String?
+  userAgent String?
+  location  String?
+  success   Boolean  @default(true)
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("login_history")
+}
+
+model Device {
+  id         String   @id @default(cuid())
+  userId     String
+  name       String
+  type       String
+  browser    String?
+  os         String?
+  lastUsedAt DateTime @default(now())
+  trusted    Boolean  @default(false)
+  createdAt  DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("devices")
+}
+
+model Follow {
+  id          String   @id @default(cuid())
+  followerId  String
+  followingId String
+  createdAt   DateTime @default(now())
+
+  follower  User @relation("following", fields: [followerId], references: [id], onDelete: Cascade)
+  following User @relation("followers", fields: [followingId], references: [id], onDelete: Cascade)
+
+  @@unique([followerId, followingId])
+  @@map("follows")
+}
+
+// ─────────────────────────────────────────────
+// Multi-Tenant: Organizations & Workspaces
+// ─────────────────────────────────────────────
+
+model Organization {
+  id          String  @id @default(cuid())
+  name        String
+  slug        String  @unique
+  logo        String?
+  description String?
+  website     String?
+  industry    String?
+  size        String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  workspaces    Workspace[]
+  subscriptions Subscription[]
+  invoices      Invoice[]
+  auditLogs     AuditLog[]
+
+  @@map("organizations")
+}
+
+model Workspace {
+  id             String  @id @default(cuid())
+  organizationId String
+  name           String
+  slug           String  @unique
+  description    String?
+  logo           String?
+  customDomain   String? @unique
+  subdomain      String? @unique
+  isActive       Boolean @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  organization Organization      @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  members      WorkspaceMember[]
+  posts        Post[]
+  categories   Category[]
+  tags         Tag[]
+  subscribers  Subscriber[]
+  newsletters  Newsletter[]
+  settings     Setting[]
+  integrations Integration[]
+  featureFlags FeatureFlag[]
+  analytics    AnalyticsEvent[]
+  invitations  Invitation[]
+
+  @@map("workspaces")
+}
+
+model WorkspaceMember {
+  id          String   @id @default(cuid())
+  userId      String
+  workspaceId String
+  roleId      String
+  joinedAt    DateTime @default(now())
+  isActive    Boolean  @default(true)
+
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  role      Role      @relation(fields: [roleId], references: [id])
+
+  @@unique([userId, workspaceId])
+  @@map("workspace_members")
+}
+
+model Role {
+  id          String   @id @default(cuid())
+  name        String   @unique
+  displayName String
+  description String?
+  isSystem    Boolean  @default(false)
+  createdAt   DateTime @default(now())
+
+  members     WorkspaceMember[]
+  permissions RolePermission[]
+
+  @@map("roles")
+}
+
+model Permission {
+  id          String @id @default(cuid())
+  name        String @unique
+  displayName String
+  description String?
+  resource    String
+  action      String
+
+  roles RolePermission[]
+
+  @@map("permissions")
+}
+
+model RolePermission {
+  roleId       String
+  permissionId String
+
+  role       Role       @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  permission Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+
+  @@id([roleId, permissionId])
+  @@map("role_permissions")
+}
+
+model Invitation {
+  id          String   @id @default(cuid())
+  email       String
+  workspaceId String
+  roleId      String
+  token       String   @unique
+  status      InvitationStatus @default(PENDING)
+  invitedBy   String
+  expiresAt   DateTime
+  createdAt   DateTime @default(now())
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@map("invitations")
+}
+
+enum InvitationStatus {
+  PENDING
+  ACCEPTED
+  EXPIRED
+  REVOKED
+}
+
+// ─────────────────────────────────────────────
+// Content: Posts, Categories, Tags
+// ─────────────────────────────────────────────
+
+model Post {
+  id            String     @id @default(cuid())
+  title         String
+  slug          String
+  excerpt       String?    @db.Text
+  content       Json?
+  contentHtml   String?    @db.Text
+  coverImage    String?
+  readingTime   Int?
+  wordCount     Int?
+  status        PostStatus @default(DRAFT)
+  visibility    PostVisibility @default(PUBLIC)
+  isPinned      Boolean    @default(false)
+  isFeatured    Boolean    @default(false)
+  publishedAt   DateTime?
+  scheduledAt   DateTime?
+  metaTitle     String?
+  metaDesc      String?    @db.Text
+  canonicalUrl  String?
+  ogImage       String?
+  schemaMarkup  Json?
+  seoScore      Int?
+  aiScore       Int?
+
+  authorId    String
+  workspaceId String
+  categoryId  String?
+  seriesId    String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  author    User       @relation(fields: [authorId], references: [id])
+  workspace Workspace  @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  category  Category?  @relation(fields: [categoryId], references: [id])
+  series    Series?    @relation(fields: [seriesId], references: [id])
+
+  tags       PostTag[]
+  comments   Comment[]
+  reactions  Reaction[]
+  bookmarks  Bookmark[]
+  versions   PostVersion[]
+  analytics  AnalyticsEvent[]
+  collections CollectionPost[]
+
+  @@unique([slug, workspaceId])
+  @@index([workspaceId, status, publishedAt])
+  @@index([authorId])
+  @@map("posts")
+}
+
+enum PostStatus {
+  DRAFT
+  PUBLISHED
+  SCHEDULED
+  ARCHIVED
+}
+
+enum PostVisibility {
+  PUBLIC
+  PRIVATE
+  MEMBERS_ONLY
+  PREMIUM
+}
+
+model PostVersion {
+  id        String   @id @default(cuid())
+  postId    String
+  title     String
+  content   Json?
+  version   Int
+  createdAt DateTime @default(now())
+
+  post Post @relation(fields: [postId], references: [id], onDelete: Cascade)
+
+  @@map("post_versions")
+}
+
+model Category {
+  id          String  @id @default(cuid())
+  name        String
+  slug        String
+  description String?
+  color       String?
+  icon        String?
+  parentId    String?
+  workspaceId String
+  sortOrder   Int     @default(0)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  workspace Workspace  @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  parent    Category?  @relation("CategoryChildren", fields: [parentId], references: [id])
+  children  Category[] @relation("CategoryChildren")
+  posts     Post[]
+
+  @@unique([slug, workspaceId])
+  @@map("categories")
+}
+
+model Tag {
+  id          String @id @default(cuid())
+  name        String
+  slug        String
+  workspaceId String
+  usageCount  Int    @default(0)
+
+  createdAt DateTime @default(now())
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  posts     PostTag[]
+
+  @@unique([slug, workspaceId])
+  @@map("tags")
+}
+
+model PostTag {
+  postId String
+  tagId  String
+
+  post Post @relation(fields: [postId], references: [id], onDelete: Cascade)
+  tag  Tag  @relation(fields: [tagId], references: [id], onDelete: Cascade)
+
+  @@id([postId, tagId])
+  @@map("post_tags")
+}
+
+model Series {
+  id          String  @id @default(cuid())
+  title       String
+  slug        String
+  description String?
+  coverImage  String?
+  sortOrder   Int     @default(0)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  posts Post[]
+
+  @@map("series")
+}
+
+model Collection {
+  id          String  @id @default(cuid())
+  name        String
+  slug        String
+  description String?
+  isPublic    Boolean @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  posts CollectionPost[]
+
+  @@map("collections")
+}
+
+model CollectionPost {
+  collectionId String
+  postId       String
+  sortOrder    Int @default(0)
+
+  collection Collection @relation(fields: [collectionId], references: [id], onDelete: Cascade)
+  post       Post       @relation(fields: [postId], references: [id], onDelete: Cascade)
+
+  @@id([collectionId, postId])
+  @@map("collection_posts")
+}
+
+// ─────────────────────────────────────────────
+// Comments & Reactions
+// ─────────────────────────────────────────────
+
+model Comment {
+  id       String  @id @default(cuid())
+  content  String  @db.Text
+  postId   String
+  authorId String
+  parentId String?
+  isPinned Boolean @default(false)
+  isSpam   Boolean @default(false)
+  status   CommentStatus @default(APPROVED)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  post     Post      @relation(fields: [postId], references: [id], onDelete: Cascade)
+  author   User      @relation(fields: [authorId], references: [id])
+  parent   Comment?  @relation("CommentReplies", fields: [parentId], references: [id])
+  replies  Comment[] @relation("CommentReplies")
+  reactions Reaction[]
+
+  @@index([postId, createdAt])
+  @@map("comments")
+}
+
+enum CommentStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  SPAM
+}
+
+model Reaction {
+  id        String @id @default(cuid())
+  emoji     String
+  userId    String
+  postId    String?
+  commentId String?
+
+  createdAt DateTime @default(now())
+
+  user    User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  post    Post?    @relation(fields: [postId], references: [id], onDelete: Cascade)
+  comment Comment? @relation(fields: [commentId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, postId, emoji])
+  @@unique([userId, commentId, emoji])
+  @@map("reactions")
+}
+
+model Bookmark {
+  id     String @id @default(cuid())
+  userId String
+  postId String
+
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  post Post @relation(fields: [postId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, postId])
+  @@map("bookmarks")
+}
+
+// ─────────────────────────────────────────────
+// Newsletter & Subscribers
+// ─────────────────────────────────────────────
+
+model Subscriber {
+  id          String           @id @default(cuid())
+  email       String
+  name        String?
+  workspaceId String
+  status      SubscriberStatus @default(ACTIVE)
+  source      String?
+  metadata    Json?
+
+  subscribedAt   DateTime @default(now())
+  unsubscribedAt DateTime?
+
+  workspace Workspace          @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  emails    NewsletterRecipient[]
+
+  @@unique([email, workspaceId])
+  @@map("subscribers")
+}
+
+enum SubscriberStatus {
+  ACTIVE
+  UNSUBSCRIBED
+  BOUNCED
+  COMPLAINED
+}
+
+model Newsletter {
+  id          String           @id @default(cuid())
+  subject     String
+  content     String           @db.Text
+  previewText String?
+  status      NewsletterStatus @default(DRAFT)
+  workspaceId String
+  scheduledAt DateTime?
+  sentAt      DateTime?
+  openRate    Float?
+  clickRate   Float?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  workspace  Workspace             @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  recipients NewsletterRecipient[]
+
+  @@map("newsletters")
+}
+
+enum NewsletterStatus {
+  DRAFT
+  SCHEDULED
+  SENDING
+  SENT
+  FAILED
+}
+
+model NewsletterRecipient {
+  id           String    @id @default(cuid())
+  newsletterId String
+  subscriberId String
+  sentAt       DateTime?
+  openedAt     DateTime?
+  clickedAt    DateTime?
+  bouncedAt    DateTime?
+
+  newsletter Newsletter @relation(fields: [newsletterId], references: [id], onDelete: Cascade)
+  subscriber Subscriber @relation(fields: [subscriberId], references: [id], onDelete: Cascade)
+
+  @@map("newsletter_recipients")
+}
+
+// ─────────────────────────────────────────────
+// Analytics
+// ─────────────────────────────────────────────
+
+model AnalyticsEvent {
+  id          String   @id @default(cuid())
+  event       String
+  postId      String?
+  workspaceId String
+  visitorId   String?
+  sessionId   String?
+  ipAddress   String?
+  country     String?
+  city        String?
+  device      String?
+  browser     String?
+  os          String?
+  referrer    String?
+  utm_source  String?
+  utm_medium  String?
+  utm_campaign String?
+  duration    Int?
+  metadata    Json?
+
+  createdAt DateTime @default(now())
+
+  post      Post?     @relation(fields: [postId], references: [id], onDelete: SetNull)
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@index([workspaceId, createdAt])
+  @@index([postId, createdAt])
+  @@map("analytics_events")
+}
+
+// ─────────────────────────────────────────────
+// Notifications
+// ─────────────────────────────────────────────
+
+model Notification {
+  id      String           @id @default(cuid())
+  userId  String
+  type    NotificationType
+  title   String
+  message String
+  link    String?
+  isRead  Boolean          @default(false)
+  metadata Json?
+
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, isRead, createdAt])
+  @@map("notifications")
+}
+
+enum NotificationType {
+  COMMENT
+  REPLY
+  MENTION
+  LIKE
+  FOLLOW
+  SUBSCRIPTION
+  SYSTEM
+  BILLING
+  SECURITY
+}
+
+// ─────────────────────────────────────────────
+// Billing & Subscriptions
+// ─────────────────────────────────────────────
+
+model BillingPlan {
+  id            String  @id @default(cuid())
+  name          String
+  slug          String  @unique
+  description   String?
+  monthlyPrice  Int
+  yearlyPrice   Int
+  currency      String  @default("usd")
+  features      Json
+  limits        Json
+  isActive      Boolean @default(true)
+  stripePriceIdMonthly String?
+  stripePriceIdYearly  String?
+  sortOrder     Int     @default(0)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  subscriptions Subscription[]
+
+  @@map("billing_plans")
+}
+
+model Subscription {
+  id                 String             @id @default(cuid())
+  organizationId     String
+  planId             String
+  stripeSubscriptionId String?          @unique
+  stripeCustomerId   String?
+  status             SubscriptionStatus @default(ACTIVE)
+  currentPeriodStart DateTime
+  currentPeriodEnd   DateTime
+  cancelAtPeriodEnd  Boolean            @default(false)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  plan         BillingPlan  @relation(fields: [planId], references: [id])
+
+  @@map("subscriptions")
+}
+
+enum SubscriptionStatus {
+  ACTIVE
+  PAST_DUE
+  CANCELED
+  TRIALING
+  INCOMPLETE
+}
+
+model Invoice {
+  id               String        @id @default(cuid())
+  organizationId   String
+  stripeInvoiceId  String?       @unique
+  amount           Int
+  currency         String        @default("usd")
+  status           InvoiceStatus @default(PENDING)
+  paidAt           DateTime?
+  invoiceUrl       String?
+  invoicePdf       String?
+
+  createdAt DateTime @default(now())
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@map("invoices")
+}
+
+enum InvoiceStatus {
+  PENDING
+  PAID
+  FAILED
+  REFUNDED
+}
+
+// ─────────────────────────────────────────────
+// Audit & Security
+// ─────────────────────────────────────────────
+
+model AuditLog {
+  id             String  @id @default(cuid())
+  userId         String?
+  organizationId String?
+  action         String
+  resource       String
+  resourceId     String?
+  details        Json?
+  ipAddress      String?
+  userAgent      String?
+
+  createdAt DateTime @default(now())
+
+  user         User?         @relation(fields: [userId], references: [id], onDelete: SetNull)
+  organization Organization? @relation(fields: [organizationId], references: [id], onDelete: SetNull)
+
+  @@index([organizationId, createdAt])
+  @@index([userId, createdAt])
+  @@map("audit_logs")
+}
+
+// ─────────────────────────────────────────────
+// Integrations & API
+// ─────────────────────────────────────────────
+
+model Integration {
+  id          String  @id @default(cuid())
+  workspaceId String
+  provider    String
+  name        String
+  config      Json?
+  isActive    Boolean @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@unique([workspaceId, provider])
+  @@map("integrations")
+}
+
+model APIKey {
+  id          String   @id @default(cuid())
+  userId      String
+  name        String
+  key         String   @unique
+  prefix      String
+  lastUsedAt  DateTime?
+  expiresAt   DateTime?
+  isActive    Boolean  @default(true)
+  permissions Json?
+
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("api_keys")
+}
+
+// ─────────────────────────────────────────────
+// AI Usage Tracking
+// ─────────────────────────────────────────────
+
+model AIUsage {
+  id       String @id @default(cuid())
+  userId   String
+  feature  String
+  model    String
+  tokens   Int
+  cost     Float?
+  metadata Json?
+
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+  @@map("ai_usage")
+}
+
+// ─────────────────────────────────────────────
+// Feature Flags & Settings
+// ─────────────────────────────────────────────
+
+model FeatureFlag {
+  id          String  @id @default(cuid())
+  key         String
+  name        String
+  description String?
+  isEnabled   Boolean @default(false)
+  workspaceId String?
+  metadata    Json?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  workspace Workspace? @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@unique([key, workspaceId])
+  @@map("feature_flags")
+}
+
+model Setting {
+  id          String @id @default(cuid())
+  key         String
+  value       Json
+  workspaceId String
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@unique([key, workspaceId])
+  @@map("settings")
+}
