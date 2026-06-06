@@ -1,326 +1,664 @@
 "use client";
 
-import { useEffect, useState, use } from "react";
+import { motion, useInView } from "framer-motion";
+import { useRef } from "react";
 import Link from "next/link";
-import { notFound } from "next/navigation";
-import { motion } from "framer-motion";
-import { Calendar, Clock, ArrowLeft, Send, Sparkles, MessageSquare, Reply, User } from "lucide-react";
-import { getPublicPostBySlug, PostData } from "@/actions/posts";
-import { getCommentsForPost, addComment, CommentData } from "@/actions/comments";
+import {
+  ArrowRight,
+  Sparkles,
+  PenTool,
+  BarChart3,
+  Search,
+  Building2,
+  Mail,
+  CreditCard,
+  Zap,
+  Shield,
+  Play,
+  Check,
+  Star,
+  ArrowUpRight,
+  Users,
+  FileText,
+  TrendingUp,
+  Eye,
+} from "lucide-react";
+import { Navbar } from "@/components/shared/navbar";
+import {
+  FEATURES,
+  PRICING_PLANS,
+} from "@/lib/constants";
+import { useState } from "react";
 
-interface PageProps {
-  params: Promise<{ slug: string }>;
+/* ─── Icon Map ─── */
+const iconMap: Record<string, React.ElementType> = {
+  Sparkles, PenTool, BarChart3, Search, Building2, Mail, CreditCard, Zap, Shield,
+};
+
+/* ─── Animation Variants ─── */
+const fadeUp = {
+  hidden: { opacity: 0, y: 30 },
+  visible: { opacity: 1, y: 0 },
+};
+
+const stagger = {
+  visible: { transition: { staggerChildren: 0.1 } },
+};
+
+const scaleIn = {
+  hidden: { opacity: 0, scale: 0.95 },
+  visible: { opacity: 1, scale: 1 },
+};
+
+/* ─── Section Wrapper ─── */
+function Section({
+  children,
+  className = "",
+  id,
+}: {
+  children: React.ReactNode;
+  className?: string;
+  id?: string;
+}) {
+  const ref = useRef(null);
+  const isInView = useInView(ref, { once: true, margin: "-100px" });
+
+  return (
+    <motion.section
+      ref={ref}
+      id={id}
+      initial="hidden"
+      animate={isInView ? "visible" : "hidden"}
+      variants={stagger}
+      className={`py-24 lg:py-32 ${className}`}
+    >
+      {children}
+    </motion.section>
+  );
 }
 
-export default function ArticleView({ params }: PageProps) {
-  const { slug } = use(params);
-  const [post, setPost] = useState<PostData | null>(null);
-  const [comments, setComments] = useState<CommentData[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+/* ═══════════════════════════════════════════════
+   HERO SECTION
+   ═══════════════════════════════════════════════ */
+function HeroSection() {
+  return (
+    <section className="relative min-h-screen flex items-center justify-center overflow-hidden">
+      {/* Background Effects */}
+      <div className="absolute inset-0 gradient-mesh" />
+      <div className="absolute inset-0 dot-pattern opacity-40" />
 
-  // New Comment Form States
-  const [commentText, setCommentText] = useState("");
-  const [authorName, setAuthorName] = useState("");
-  const [authorEmail, setAuthorEmail] = useState("");
-  const [replyToId, setReplyToId] = useState<string | null>(null);
-  const [replyToName, setReplyToName] = useState<string | null>(null);
-  const [isSubmitting, setIsSubmitting] = useState(false);
+      {/* Floating orbs */}
+      <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-indigo-200/20 rounded-full blur-3xl animate-float" />
+      <div className="absolute bottom-1/4 right-1/4 w-80 h-80 bg-purple-200/20 rounded-full blur-3xl animate-float" style={{ animationDelay: "3s" }} />
+      <div className="absolute top-1/2 right-1/3 w-64 h-64 bg-blue-200/15 rounded-full blur-3xl animate-float" style={{ animationDelay: "1.5s" }} />
 
-  useEffect(() => {
-    async function loadPost() {
-      try {
-        const pData = await getPublicPostBySlug(slug);
-        if (pData) {
-          setPost(pData);
-          const cData = await getCommentsForPost(pData.id);
-          setComments(cData);
-        } else {
-          setPost(null);
-        }
-      } catch (err) {
-        console.error("Failed to load article", err);
-      } finally {
-        setIsLoading(false);
-      }
-    }
-    loadPost();
-  }, [slug]);
-
-  if (isLoading) {
-    return (
-      <div className="flex flex-col items-center justify-center py-40 gap-4">
-        <div className="w-8 h-8 border-3 border-indigo-500/20 border-t-indigo-600 rounded-full animate-spin" />
-        <p className="text-xs text-slate-400 font-medium">Loading story...</p>
-      </div>
-    );
-  }
-
-  if (!post) {
-    notFound();
-  }
-
-  const handleCommentSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!commentText || !authorName || !authorEmail) return;
-
-    setIsSubmitting(true);
-    try {
-      const added = await addComment(post.id, commentText, replyToId, {
-        name: authorName,
-        email: authorEmail
-      });
-
-      // Update comments local list
-      const updated = await getCommentsForPost(post.id);
-      setComments(updated);
-
-      setCommentText("");
-      setReplyToId(null);
-      setReplyToName(null);
-    } catch (err) {
-      console.error(err);
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
-
-  const renderBlock = (block: any) => {
-    switch (block.type) {
-      case "heading-1":
-        return (
-          <h2 key={block.id} className="text-3xl font-extrabold text-slate-900 tracking-tight mt-10 mb-4" style={{ fontFamily: "var(--font-display)" }}>
-            {block.content}
-          </h2>
-        );
-      case "heading-2":
-        return (
-          <h3 key={block.id} className="text-2xl font-bold text-slate-900 tracking-tight mt-8 mb-3.5" style={{ fontFamily: "var(--font-display)" }}>
-            {block.content}
-          </h3>
-        );
-      case "heading-3":
-        return (
-          <h4 key={block.id} className="text-xl font-bold text-slate-900 tracking-tight mt-6 mb-3" style={{ fontFamily: "var(--font-display)" }}>
-            {block.content}
-          </h4>
-        );
-      case "blockquote":
-        return (
-          <blockquote key={block.id} className="text-lg italic text-slate-500 border-l-4 border-indigo-500 pl-4 py-1.5 my-6 bg-slate-50/60 rounded-r-xl">
-            {block.content}
-          </blockquote>
-        );
-      case "code":
-        return (
-          <pre key={block.id} className="font-mono text-sm bg-slate-950 text-slate-200 p-4.5 rounded-2xl my-6 overflow-x-auto">
-            <code>{block.content}</code>
-          </pre>
-        );
-      case "image":
-        return block.content ? (
-          <div key={block.id} className="my-8">
-            <img src={block.content} alt="Article imagery" className="w-full rounded-2xl shadow-md border border-slate-100 object-cover max-h-[450px]" />
-          </div>
-        ) : null;
-      case "list-bullet":
-        return (
-          <div key={block.id} className="flex items-start gap-2.5 pl-2 my-2.5">
-            <div className="w-1.5 h-1.5 rounded-full bg-slate-400 mt-2.5 flex-shrink-0" />
-            <p className="text-slate-700 leading-relaxed">{block.content}</p>
-          </div>
-        );
-      case "list-number":
-        return (
-          <div key={block.id} className="flex items-start gap-2 pl-2 my-2.5">
-            <span className="text-slate-400 font-semibold mr-1">·</span>
-            <p className="text-slate-700 leading-relaxed">{block.content}</p>
-          </div>
-        );
-      default:
-        return (
-          <p key={block.id} className="text-slate-700 leading-relaxed text-base my-4">
-            {block.content}
-          </p>
-        );
-    }
-  };
-
-  const renderComment = (comment: CommentData, isChild = false) => {
-    return (
-      <div key={comment.id} className={`flex gap-4 ${isChild ? "ml-10 border-l border-slate-100 pl-4 mt-4" : "mt-6"}`}>
-        <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-indigo-50 to-purple-50 flex items-center justify-center flex-shrink-0 text-xs font-bold text-indigo-500 border border-indigo-100/50">
-          {comment.authorInitials}
-        </div>
-        <div className="flex-1">
-          <div className="flex items-center gap-2">
-            <span className="text-xs font-bold text-slate-800">{comment.authorName}</span>
-            <span className="text-[10px] text-slate-400">
-              {new Date(comment.createdAt).toLocaleDateString()}
-            </span>
-          </div>
-          <p className="text-xs text-slate-600 leading-relaxed mt-1">{comment.content}</p>
-
-          <button
-            onClick={() => {
-              setReplyToId(comment.id);
-              setReplyToName(comment.authorName);
-            }}
-            className="inline-flex items-center gap-1 text-[10px] text-slate-400 hover:text-indigo-600 transition-colors mt-2"
+      <div className="relative z-10 mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 pt-32 pb-20">
+        <div className="text-center max-w-4xl mx-auto">
+          {/* Badge */}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.6, delay: 0.2 }}
           >
-            <Reply className="w-3 h-3" />
-            Reply
-          </button>
+            <span className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full text-sm font-medium glass border border-indigo-100 text-indigo-700 mb-8">
+              <Sparkles className="w-3.5 h-3.5" />
+              Introducing InkSphere — AI-Powered Blogging
+            </span>
+          </motion.div>
 
-          {/* Child replies */}
-          {comment.replies && comment.replies.map((reply) => renderComment(reply, true))}
+          {/* Heading */}
+          <motion.h1
+            initial={{ opacity: 0, y: 30 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.8, delay: 0.3, ease: [0.16, 1, 0.3, 1] }}
+            className="text-5xl sm:text-6xl lg:text-7xl font-extrabold tracking-tight leading-[1.1] mb-6"
+            style={{ fontFamily: "var(--font-display)" }}
+          >
+            Where ideas{" "}
+            <span className="gradient-text">take shape</span>
+          </motion.h1>
+
+          {/* Subtitle */}
+          <motion.p
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.7, delay: 0.5 }}
+            className="text-lg sm:text-xl text-slate-500 max-w-2xl mx-auto mb-10 leading-relaxed"
+          >
+            The AI-powered blogging platform for modern teams. Write beautifully,
+            collaborate seamlessly, and grow your audience with enterprise-grade tools.
+          </motion.p>
+
+          {/* CTA Buttons */}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.7, delay: 0.7 }}
+            className="flex flex-col sm:flex-row items-center justify-center gap-4"
+          >
+            <Link
+              href="/signup"
+              className="btn-primary inline-flex items-center gap-2 text-base px-8 py-3.5 animate-pulse-glow"
+            >
+              Start Writing Free
+              <ArrowRight className="w-4 h-4" />
+            </Link>
+            <button className="btn-secondary inline-flex items-center gap-2 text-base px-8 py-3.5">
+              <Play className="w-4 h-4" />
+              Watch Demo
+            </button>
+          </motion.div>
+
+          {/* Social proof */}
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ duration: 0.7, delay: 0.9 }}
+            className="mt-8 text-sm text-slate-400 flex items-center justify-center gap-4"
+          >
+            <span className="flex -space-x-2">
+              {[1, 2, 3, 4, 5].map((i) => (
+                <div
+                  key={i}
+                  className="w-7 h-7 rounded-full border-2 border-white gradient-brand-subtle flex items-center justify-center text-[10px] font-bold text-indigo-600"
+                >
+                  {String.fromCharCode(64 + i)}
+                </div>
+              ))}
+            </span>
+            <span>
+              Loved by <strong className="text-slate-600">50,000+</strong> creators
+            </span>
+            <span className="flex items-center gap-0.5">
+              {[1, 2, 3, 4, 5].map((i) => (
+                <Star key={i} className="w-3.5 h-3.5 fill-amber-400 text-amber-400" />
+              ))}
+            </span>
+          </motion.div>
+        </div>
+
+        {/* Hero Dashboard Preview */}
+        <motion.div
+          initial={{ opacity: 0, y: 60, scale: 0.95 }}
+          animate={{ opacity: 1, y: 0, scale: 1 }}
+          transition={{ duration: 1, delay: 1, ease: [0.16, 1, 0.3, 1] }}
+          className="mt-20 relative max-w-5xl mx-auto"
+        >
+          {/* Glow effect behind dashboard */}
+          <div className="absolute -inset-4 bg-gradient-to-r from-indigo-500/10 via-purple-500/10 to-blue-500/10 blur-3xl rounded-3xl" />
+
+          {/* Dashboard mockup */}
+          <div className="relative glass-card rounded-2xl overflow-hidden border border-slate-200/60 shadow-2xl">
+            {/* Window chrome */}
+            <div className="flex items-center gap-2 px-4 py-3 border-b border-slate-100 bg-white/80">
+              <div className="flex gap-1.5">
+                <div className="w-3 h-3 rounded-full bg-rose-400" />
+                <div className="w-3 h-3 rounded-full bg-amber-400" />
+                <div className="w-3 h-3 rounded-full bg-emerald-400" />
+              </div>
+              <div className="flex-1 flex justify-center">
+                <div className="px-4 py-1 bg-slate-50 rounded-lg text-xs text-slate-400 font-mono">
+                  app.inksphere.io/dashboard
+                </div>
+              </div>
+            </div>
+
+            {/* Dashboard content */}
+            <div className="p-6 bg-gradient-to-b from-slate-50/50 to-white">
+              {/* Header */}
+              <div className="flex items-center justify-between mb-6">
+                <div>
+                  <div className="h-3 w-32 bg-slate-200 rounded-full mb-2" />
+                  <div className="h-2 w-48 bg-slate-100 rounded-full" />
+                </div>
+                <div className="flex gap-2">
+                  <div className="h-8 w-8 rounded-lg bg-indigo-50 flex items-center justify-center">
+                    <Sparkles className="w-4 h-4 text-indigo-500" />
+                  </div>
+                  <div className="h-8 w-24 rounded-lg gradient-brand flex items-center justify-center">
+                    <span className="text-white text-xs font-medium">New Post</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Stats cards */}
+              <div className="grid grid-cols-4 gap-4 mb-6">
+                {[
+                  { icon: Eye, label: "Views", value: "24.5K", change: "+12.5%", color: "text-indigo-600 bg-indigo-50" },
+                  { icon: Users, label: "Subscribers", value: "3,842", change: "+8.2%", color: "text-purple-600 bg-purple-50" },
+                  { icon: FileText, label: "Posts", value: "156", change: "+3", color: "text-blue-600 bg-blue-50" },
+                  { icon: TrendingUp, label: "Revenue", value: "$12.4K", change: "+23.1%", color: "text-emerald-600 bg-emerald-50" },
+                ].map((stat, i) => (
+                  <div key={i} className="p-4 bg-white rounded-xl border border-slate-100 shadow-xs">
+                    <div className="flex items-center gap-2 mb-3">
+                      <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${stat.color}`}>
+                        <stat.icon className="w-4 h-4" />
+                      </div>
+                    </div>
+                    <div className="text-lg font-bold text-slate-900">{stat.value}</div>
+                    <div className="flex items-center gap-1 mt-1">
+                      <span className="text-xs text-slate-500">{stat.label}</span>
+                      <span className="text-xs text-emerald-600 font-medium">{stat.change}</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {/* Chart placeholder */}
+              <div className="p-4 bg-white rounded-xl border border-slate-100">
+                <div className="flex items-center justify-between mb-4">
+                  <span className="text-sm font-semibold text-slate-700">Audience Growth</span>
+                  <div className="flex gap-1">
+                    {["7d", "30d", "90d"].map((period) => (
+                      <button
+                        key={period}
+                        className={`px-2.5 py-1 text-xs rounded-md font-medium transition-colors ${
+                          period === "30d"
+                            ? "bg-indigo-50 text-indigo-700"
+                            : "text-slate-400 hover:text-slate-600"
+                        }`}
+                      >
+                        {period}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                {/* SVG Chart */}
+                <svg className="w-full h-32" viewBox="0 0 600 120" fill="none">
+                  <defs>
+                    <linearGradient id="chartGrad" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="0%" stopColor="#6366F1" stopOpacity="0.15" />
+                      <stop offset="100%" stopColor="#6366F1" stopOpacity="0" />
+                    </linearGradient>
+                  </defs>
+                  <path
+                    d="M0,100 C50,95 100,80 150,70 C200,60 250,50 300,40 C350,30 400,35 450,25 C500,15 550,10 600,5"
+                    stroke="#6366F1"
+                    strokeWidth="2.5"
+                    fill="none"
+                    strokeLinecap="round"
+                  />
+                  <path
+                    d="M0,100 C50,95 100,80 150,70 C200,60 250,50 300,40 C350,30 400,35 450,25 C500,15 550,10 600,5 L600,120 L0,120 Z"
+                    fill="url(#chartGrad)"
+                  />
+                </svg>
+              </div>
+            </div>
+          </div>
+        </motion.div>
+      </div>
+    </section>
+  );
+}
+
+/* ═══════════════════════════════════════════════
+   TRUSTED BY SECTION
+   ═══════════════════════════════════════════════ */
+function TrustedBySection() {
+  const logos = [
+    "Stripe", "Vercel", "Notion", "Linear", "Figma",
+    "GitHub", "Slack", "Shopify", "Atlassian", "Datadog",
+  ];
+
+  return (
+    <Section className="py-16 lg:py-20 border-y border-slate-100 bg-slate-50/50">
+      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+        <motion.p
+          variants={fadeUp}
+          className="text-center text-sm font-medium text-slate-400 uppercase tracking-widest mb-10"
+        >
+          Trusted by teams at the world&apos;s best companies
+        </motion.p>
+        <div className="relative overflow-hidden">
+          {/* Fade edges */}
+          <div className="absolute left-0 top-0 bottom-0 w-24 bg-gradient-to-r from-slate-50/80 to-transparent z-10" />
+          <div className="absolute right-0 top-0 bottom-0 w-24 bg-gradient-to-l from-slate-50/80 to-transparent z-10" />
+          <div className="flex animate-marquee">
+            {[...logos, ...logos].map((name, i) => (
+              <div
+                key={i}
+                className="flex-shrink-0 mx-10 flex items-center justify-center"
+              >
+                <span className="text-xl font-bold text-slate-300 tracking-tight whitespace-nowrap" style={{ fontFamily: "var(--font-display)" }}>
+                  {name}
+                </span>
+              </div>
+            ))}
+          </div>
         </div>
       </div>
-    );
+    </Section>
+  );
+}
+
+/* ═══════════════════════════════════════════════
+   FEATURES SECTION
+   ═══════════════════════════════════════════════ */
+function FeaturesSection() {
+  return (
+    <Section id="features" className="relative">
+      <div className="absolute inset-0 gradient-mesh opacity-50" />
+      <div className="relative mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+        {/* Section Header */}
+        <div className="text-center max-w-3xl mx-auto mb-16">
+          <motion.span
+            variants={fadeUp}
+            className="inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-semibold bg-indigo-50 text-indigo-600 mb-4"
+          >
+            <Zap className="w-3 h-3" />
+            FEATURES
+          </motion.span>
+          <motion.h2
+            variants={fadeUp}
+            className="text-3xl sm:text-4xl lg:text-5xl font-extrabold tracking-tight mb-4"
+            style={{ fontFamily: "var(--font-display)" }}
+          >
+            Everything you need to{" "}
+            <span className="gradient-text">publish at scale</span>
+          </motion.h2>
+          <motion.p
+            variants={fadeUp}
+            className="text-lg text-slate-500"
+          >
+            From AI-powered writing to enterprise analytics, InkSphere gives you
+            all the tools to create, grow, and monetize your content.
+          </motion.p>
+        </div>
+
+        {/* Features Grid */}
+        <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-5">
+          {FEATURES.map((feature, i) => {
+            const Icon = iconMap[feature.icon] || Sparkles;
+            return (
+              <motion.div
+                key={i}
+                variants={scaleIn}
+                className="glass-card rounded-2xl p-6 group cursor-default"
+              >
+                <div className="w-11 h-11 rounded-xl gradient-brand-subtle flex items-center justify-center mb-4 group-hover:scale-110 transition-transform duration-300">
+                  <Icon className="w-5 h-5 text-indigo-600" />
+                </div>
+                <h3 className="text-lg font-semibold text-slate-900 mb-2" style={{ fontFamily: "var(--font-display)" }}>
+                  {feature.title}
+                </h3>
+                <p className="text-sm text-slate-500 leading-relaxed">
+                  {feature.description}
+                </p>
+              </motion.div>
+            );
+          })}
+        </div>
+      </div>
+    </Section>
+  );
+}
+
+/* ═══════════════════════════════════════════════
+   PRICING SECTION
+   ═══════════════════════════════════════════════ */
+function PricingSection() {
+  const [yearly, setYearly] = useState(false);
+
+  return (
+    <Section id="pricing" className="bg-slate-50/50 border-y border-slate-100">
+      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+        <div className="text-center max-w-3xl mx-auto mb-16">
+          <motion.span
+            variants={fadeUp}
+            className="inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-600 mb-4"
+          >
+            <CreditCard className="w-3 h-3" />
+            PRICING
+          </motion.span>
+          <motion.h2
+            variants={fadeUp}
+            className="text-3xl sm:text-4xl font-extrabold tracking-tight mb-4"
+            style={{ fontFamily: "var(--font-display)" }}
+          >
+            Simple, transparent{" "}
+            <span className="gradient-text">pricing</span>
+          </motion.h2>
+          <motion.p variants={fadeUp} className="text-lg text-slate-500 mb-8">
+            Start free. Upgrade when you&apos;re ready. No hidden fees.
+          </motion.p>
+
+          {/* Toggle */}
+          <motion.div variants={fadeUp} className="flex items-center justify-center gap-3">
+            <span className={`text-sm font-medium ${!yearly ? "text-slate-900" : "text-slate-400"}`}>Monthly</span>
+            <button
+              onClick={() => setYearly(!yearly)}
+              className={`relative w-12 h-6 rounded-full transition-colors ${yearly ? "bg-indigo-600" : "bg-slate-300"}`}
+            >
+              <div
+                className={`absolute top-1 w-4 h-4 rounded-full bg-white shadow-sm transition-transform ${
+                  yearly ? "translate-x-7" : "translate-x-1"
+                }`}
+              />
+            </button>
+            <span className={`text-sm font-medium ${yearly ? "text-slate-900" : "text-slate-400"}`}>
+              Yearly
+              <span className="ml-1.5 px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-600 text-xs font-semibold">
+                Save 17%
+              </span>
+            </span>
+          </motion.div>
+        </div>
+
+        {/* Pricing Cards */}
+        <div className="grid md:grid-cols-3 gap-6 max-w-5xl mx-auto">
+          {PRICING_PLANS.map((plan, i) => (
+            <motion.div
+              key={i}
+              variants={scaleIn}
+              className={`relative rounded-2xl p-1 ${
+                plan.highlighted
+                  ? "bg-gradient-to-b from-indigo-500 via-purple-500 to-indigo-600"
+                  : ""
+              }`}
+            >
+              {plan.highlighted && (
+                <div className="absolute -top-4 left-1/2 -translate-x-1/2 px-4 py-1 rounded-full gradient-brand text-white text-xs font-semibold shadow-lg">
+                  Most Popular
+                </div>
+              )}
+              <div
+                className={`h-full rounded-xl p-6 ${
+                  plan.highlighted
+                    ? "bg-white shadow-xl"
+                    : "glass-card"
+                }`}
+              >
+                <h3 className="text-lg font-bold text-slate-900 mb-1" style={{ fontFamily: "var(--font-display)" }}>
+                  {plan.name}
+                </h3>
+                <p className="text-sm text-slate-500 mb-5">{plan.description}</p>
+
+                <div className="mb-6">
+                  <span className="text-4xl font-extrabold text-slate-900">
+                    ${yearly ? Math.round(plan.yearlyPrice / 12) : plan.monthlyPrice}
+                  </span>
+                  <span className="text-sm text-slate-400">/mo</span>
+                  {yearly && plan.yearlyPrice > 0 && (
+                    <div className="text-xs text-slate-400 mt-1">
+                      Billed ${plan.yearlyPrice}/year
+                    </div>
+                  )}
+                </div>
+
+                <Link
+                  href="/signup"
+                  className={`block w-full text-center py-2.5 rounded-xl text-sm font-semibold transition-all ${
+                    plan.highlighted
+                      ? "btn-primary"
+                      : "btn-secondary"
+                  }`}
+                >
+                  {plan.cta}
+                </Link>
+
+                <div className="border-t border-slate-100 mt-6 pt-6 space-y-3">
+                  {plan.features.map((feature, j) => (
+                    <div key={j} className="flex items-center gap-2.5">
+                      <Check className="w-4 h-4 text-indigo-500 flex-shrink-0" />
+                      <span className="text-sm text-slate-600">{feature}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </motion.div>
+          ))}
+        </div>
+      </div>
+    </Section>
+  );
+}
+
+/* ═══════════════════════════════════════════════
+   CTA SECTION
+   ═══════════════════════════════════════════════ */
+function CTASection() {
+  return (
+    <Section className="relative overflow-hidden">
+      <div className="absolute inset-0 gradient-brand" />
+      <div className="absolute inset-0 dot-pattern opacity-10" />
+      <div className="absolute inset-0 bg-gradient-to-t from-indigo-900/20 to-transparent" />
+
+      <div className="relative mx-auto max-w-4xl px-4 sm:px-6 lg:px-8 text-center">
+        <motion.h2
+          variants={fadeUp}
+          className="text-3xl sm:text-4xl lg:text-5xl font-extrabold tracking-tight text-white mb-6"
+          style={{ fontFamily: "var(--font-display)" }}
+        >
+          Start writing your best content today
+        </motion.h2>
+        <motion.p
+          variants={fadeUp}
+          className="text-lg text-indigo-100 mb-10 max-w-2xl mx-auto"
+        >
+          Join 50,000+ creators who use InkSphere to build their audience, grow their
+          brand, and monetize their expertise.
+        </motion.p>
+        <motion.div
+          variants={fadeUp}
+          className="flex flex-col sm:flex-row items-center justify-center gap-4"
+        >
+          <Link
+            href="/signup"
+            className="inline-flex items-center gap-2 px-8 py-3.5 bg-white text-indigo-700 font-semibold rounded-xl hover:bg-indigo-50 transition-all shadow-lg hover:shadow-xl hover:-translate-y-0.5"
+          >
+            Get Started Free
+            <ArrowRight className="w-4 h-4" />
+          </Link>
+          <Link
+            href="/pricing"
+            className="inline-flex items-center gap-2 px-8 py-3.5 text-white font-semibold rounded-xl border border-white/30 hover:bg-white/10 transition-all"
+          >
+            View Pricing
+            <ArrowUpRight className="w-4 h-4" />
+          </Link>
+        </motion.div>
+        <motion.p variants={fadeUp} className="mt-6 text-sm text-indigo-200">
+          No credit card required · Free forever plan · Cancel anytime
+        </motion.p>
+      </div>
+    </Section>
+  );
+}
+
+/* ═══════════════════════════════════════════════
+   FOOTER
+   ═══════════════════════════════════════════════ */
+function Footer() {
+  const footerLinks = {
+    Product: ["Features", "Pricing", "Templates", "Changelog", "Roadmap"],
+    Resources: ["Documentation", "Blog", "API Reference", "Status", "Support"],
+    Company: ["About", "Careers", "Press", "Partners", "Contact"],
+    Legal: ["Privacy Policy", "Terms of Service", "Cookie Policy", "GDPR", "Security"],
   };
 
   return (
-    <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-      {/* Back button */}
-      <div className="mb-8">
-        <Link
-          href="/blog"
-          className="inline-flex items-center gap-1 text-xs text-slate-500 hover:text-slate-800 transition-colors"
-        >
-          <ArrowLeft className="w-3.5 h-3.5" />
-          Back to feed
-        </Link>
-      </div>
-
-      {/* Article Header */}
-      <header className="mb-10">
-        <span className="text-xs font-semibold text-indigo-600 uppercase tracking-wider">
-          {post.categoryId}
-        </span>
-        <h1 className="text-3xl sm:text-4xl lg:text-5xl font-extrabold text-slate-900 tracking-tight leading-[1.15] mt-2 mb-6" style={{ fontFamily: "var(--font-display)" }}>
-          {post.title}
-        </h1>
-
-        <div className="flex items-center justify-between border-y border-slate-100 py-4">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-lg gradient-brand-subtle flex items-center justify-center text-sm font-bold text-indigo-600">
-              {post.authorName.split(" ").map((n) => n[0]).join("")}
-            </div>
-            <div>
-              <div className="text-sm font-bold text-slate-800">{post.authorName}</div>
-              <div className="text-xs text-slate-400 flex items-center gap-1.5 mt-0.5">
-                <Calendar className="w-3.5 h-3.5" />
-                {post.publishedAt ? new Date(post.publishedAt).toLocaleDateString() : ""}
-                <span>·</span>
-                <Clock className="w-3.5 h-3.5" />
-                {post.readTime} read
+    <footer className="border-t border-slate-100 bg-white">
+      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-16">
+        <div className="grid grid-cols-2 md:grid-cols-5 gap-8">
+          {/* Brand Column */}
+          <div className="col-span-2 md:col-span-1">
+            <div className="flex items-center gap-2 mb-4">
+              <div className="w-8 h-8 rounded-xl gradient-brand flex items-center justify-center">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                  <circle cx="12" cy="12" r="10" />
+                  <path d="M12 2a7 7 0 0 1 0 20" />
+                  <path d="M12 2a7 7 0 0 0 0 20" />
+                  <path d="M2 12h20" />
+                </svg>
               </div>
+              <span className="text-lg font-bold" style={{ fontFamily: "var(--font-display)" }}>
+                InkSphere
+              </span>
+            </div>
+            <p className="text-sm text-slate-500 leading-relaxed mb-4">
+              The AI-powered blogging platform for modern teams.
+            </p>
+            <div className="flex gap-3">
+              {["X", "GH", "LI", "YT"].map((social) => (
+                <a
+                  key={social}
+                  href="#"
+                  className="w-8 h-8 rounded-lg bg-slate-100 hover:bg-slate-200 flex items-center justify-center text-xs font-bold text-slate-500 transition-colors"
+                >
+                  {social}
+                </a>
+              ))}
             </div>
           </div>
-        </div>
-      </header>
 
-      {/* Cover Image */}
-      {post.coverImage && (
-        <div className="aspect-video rounded-3xl overflow-hidden mb-12 shadow-md">
-          <img src={post.coverImage} alt={post.title} className="w-full h-full object-cover" />
-        </div>
-      )}
-
-      {/* Article Body */}
-      <article className="prose-inksphere max-w-none mb-16">
-        {post.content && post.content.map((b: any) => renderBlock(b))}
-      </article>
-
-      {/* Discussion Thread */}
-      <section className="border-t border-slate-100 pt-12 mt-16">
-        <div className="flex items-center gap-2 mb-6">
-          <MessageSquare className="w-5 h-5 text-slate-400" />
-          <h3 className="text-lg font-bold text-slate-900" style={{ fontFamily: "var(--font-display)" }}>
-            Discussion ({comments.reduce((acc, c) => acc + 1 + c.replies.length, 0)})
-          </h3>
-        </div>
-
-        {/* Comment Thread */}
-        <div className="space-y-6 divide-y divide-slate-50">
-          {comments.length === 0 ? (
-            <p className="text-xs text-slate-400 italic">No comments yet. Start the conversation!</p>
-          ) : (
-            comments.map((c) => renderComment(c))
-          )}
-        </div>
-
-        {/* Post Comment Form */}
-        <div className="glass-card rounded-2xl p-6 mt-12 border border-slate-100 shadow-sm">
-          <h4 className="text-sm font-bold text-slate-800 mb-4">
-            {replyToId ? `Reply to ${replyToName}` : "Join the discussion"}
-          </h4>
-
-          <form onSubmit={handleCommentSubmit} className="space-y-4">
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">Name</label>
-                <input
-                  type="text"
-                  value={authorName}
-                  onChange={(e) => setAuthorName(e.target.value)}
-                  placeholder="Your name"
-                  className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all"
-                  required
-                />
-              </div>
-              <div>
-                <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">Email</label>
-                <input
-                  type="email"
-                  value={authorEmail}
-                  onChange={(e) => setAuthorEmail(e.target.value)}
-                  placeholder="you@example.com"
-                  className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all"
-                  required
-                />
-              </div>
+          {/* Link Columns */}
+          {Object.entries(footerLinks).map(([category, links]) => (
+            <div key={category}>
+              <h4 className="text-sm font-semibold text-slate-900 mb-4">{category}</h4>
+              <ul className="space-y-2.5">
+                {links.map((link) => (
+                  <li key={link}>
+                    <a
+                      href="#"
+                      className="text-sm text-slate-500 hover:text-slate-700 transition-colors"
+                    >
+                      {link}
+                    </a>
+                  </li>
+                ))}
+              </ul>
             </div>
-
-            <div>
-              <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">Comment</label>
-              <textarea
-                value={commentText}
-                onChange={(e) => setCommentText(e.target.value)}
-                placeholder="Share your feedback or reply..."
-                rows={4}
-                className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all resize-none"
-                required
-              />
-            </div>
-
-            <div className="flex items-center justify-between pt-2">
-              {replyToId && (
-                <button
-                  type="button"
-                  onClick={() => { setReplyToId(null); setReplyToName(null); }}
-                  className="text-[10px] font-semibold text-slate-400 hover:text-slate-600"
-                >
-                  Cancel Reply
-                </button>
-              )}
-              <button
-                type="submit"
-                disabled={isSubmitting}
-                className="btn-primary inline-flex items-center gap-1.5 text-xs py-2 px-4 shadow-sm ml-auto"
-              >
-                {isSubmitting ? (
-                  <div className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                ) : (
-                  <>
-                    Submit Comment
-                    <Send className="w-3 h-3" />
-                  </>
-                )}
-              </button>
-            </div>
-          </form>
+          ))}
         </div>
-      </section>
-    </div>
+
+        <div className="border-t border-slate-100 mt-12 pt-8 flex flex-col sm:flex-row items-center justify-between gap-4">
+          <p className="text-sm text-slate-400">
+            © {new Date().getFullYear()} InkSphere. All rights reserved.
+          </p>
+          <div className="flex items-center gap-2">
+            <div className="w-2 h-2 bg-emerald-500 rounded-full" />
+            <span className="text-sm text-slate-400">All systems operational</span>
+          </div>
+        </div>
+      </div>
+    </footer>
+  );
+}
+
+/* ═══════════════════════════════════════════════
+   LANDING PAGE
+   ═══════════════════════════════════════════════ */
+export default function LandingPage() {
+  return (
+    <main className="relative">
+      <Navbar />
+      <HeroSection />
+      <TrustedBySection />
+      <FeaturesSection />
+      <PricingSection />
+      <CTASection />
+      <Footer />
+    </main>
   );
 }
