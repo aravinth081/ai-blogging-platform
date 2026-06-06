@@ -18,19 +18,9 @@ export const NAV_LINKS = [
 export const DASHBOARD_NAV = [
   { label: "Overview", href: "/dashboard", icon: "LayoutDashboard" },
   { label: "Posts", href: "/dashboard/posts", icon: "FileText" },
-  { label: "Categories", href: "/dashboard/categories", icon: "FolderOpen" },
   { label: "Comments", href: "/dashboard/comments", icon: "MessageSquare" },
-  { label: "Analytics", href: "/dashboard/analytics", icon: "BarChart3" },
   { label: "Subscribers", href: "/dashboard/subscribers", icon: "Users" },
-  { label: "Newsletter", href: "/dashboard/newsletter", icon: "Mail" },
-  { label: "SEO", href: "/dashboard/seo", icon: "Search" },
-  { label: "AI Tools", href: "/dashboard/ai-tools", icon: "Sparkles" },
-  { label: "Billing", href: "/dashboard/billing", icon: "CreditCard" },
-  { label: "Integrations", href: "/dashboard/integrations", icon: "Puzzle" },
-  { label: "Team", href: "/dashboard/team", icon: "UserPlus" },
   { label: "Settings", href: "/dashboard/settings", icon: "Settings" },
-  { label: "Audit Logs", href: "/dashboard/audit-logs", icon: "Shield" },
-  { label: "Notifications", href: "/dashboard/notifications", icon: "Bell" },
 ] as const;
 
 export const PRICING_PLANS = [
